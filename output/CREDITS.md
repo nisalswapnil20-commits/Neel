@@ -13,3 +13,9 @@ Background footage: Mixkit (https://mixkit.co), free under the Mixkit Free Licen
 
 Fonts: Rozha One, Mukta (Google Fonts, SIL Open Font License).
 All typography, particles, ripples, and light effects are generated in code (`source/`).
+
+## Raj_Shamani_Sleep_Reel_9x16.mp4
+- Voice: audio supplied by the channel owner (Raj Shamani podcast clip).
+- Photos: the 3 photos supplied by the channel owner (no extra web images used).
+- Background music, typing clicks and impact sounds: generated in code (`source/raj_shamani_reel/music.py`), no third-party music.
+- Fonts (SIL OFL): Tiro Devanagari Hindi, Hind, Anton, Courier Prime.
