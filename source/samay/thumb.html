@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:Martel;font-weight:800;src:url(fonts/martel-devanagari-800-normal.woff2)}
+@font-face{font-family:Oswald;font-weight:600;src:url(fonts/oswald-latin-600-normal.woff2)}
+@font-face{font-family:Elite;src:url(fonts/special-elite-latin-400-normal.woff2)}
+body{margin:0}</style></head><body><script src="imgs.js"></script><canvas id="c" width="1280" height="720"></canvas><script>
+const X=document.getElementById('c').getContext('2d');
+window.draw=async()=>{
+ await Promise.all([document.fonts.load('800 100px Martel','पहले'),document.fonts.load('600 40px Oswald'),document.fonts.load('40px Elite')]);
+ const im=new Image();im.src=IMGDATA['1561b7d4-image.jpg'];await im.decode();
+ X.fillStyle='#0a0607';X.fillRect(0,0,1280,720);
+ // photo left: crop face region
+ const sw=860,sh=860*720/700, sx=230, sy=120;
+ X.filter='contrast(1.12) saturate(1.15) brightness(1.05)';
+ X.drawImage(im,sx,sy,sw,sh,-40,0,700*1.0,720);X.filter='none';
+ let g=X.createLinearGradient(330,0,680,0);g.addColorStop(0,'rgba(10,6,7,0)');g.addColorStop(1,'#0a0607');
+ X.fillStyle=g;X.fillRect(0,0,1280,720);
+ g=X.createRadialGradient(980,380,0,980,380,520);g.addColorStop(0,'rgba(170,20,26,.55)');g.addColorStop(1,'rgba(0,0,0,0)');
+ X.fillStyle=g;X.fillRect(0,0,1280,720);
+ // chip
+ X.font='600 36px Oswald';X.letterSpacing='5px';const lw=X.measureText('SAMAY RAINA').width;
+ X.fillStyle='#e5262b';X.fillRect(600,70,lw+40,58);X.fillStyle='#fff';X.textBaseline='middle';X.fillText('SAMAY RAINA',620,101);
+ X.letterSpacing='0px';X.textBaseline='alphabetic';
+ X.shadowColor='rgba(0,0,0,.8)';X.shadowBlur=18;
+ X.font='800 92px Martel';X.fillStyle='#fff';X.fillText('पहले पैसे,',600,265);
+ X.fillStyle='#ffcf4a';X.fillText('फिर वक़्त',600,395);
+ X.shadowBlur=0;
+ X.fillStyle='#e5262b';X.fillRect(604,425,470,10);
+ X.font='46px Elite';X.fillStyle='#f4ede4';X.fillText('the route to be',604,515);
+ X.font='600 96px Oswald';X.letterSpacing='4px';X.fillStyle='#ffcf4a';X.fillText('HAPPY',604,625);
+ X.letterSpacing='0px';X.fillStyle='#e5262b';X.fillRect(904,560,18,68);
+ // quote mark
+ X.font='800 220px Martel';X.fillStyle='rgba(229,38,43,.25)';X.fillText('“',1110,240);
+ // vignette
+ g=X.createRadialGradient(640,360,300,640,360,800);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.55)');X.fillStyle=g;X.fillRect(0,0,1280,720);
+ return document.getElementById('c').toDataURL('image/jpeg',0.92);
+};</script></body></html>
