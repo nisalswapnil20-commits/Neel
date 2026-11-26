@@ -1,0 +1,234 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Tiro;src:url(fonts/TiroDevanagariHindi-Regular.ttf)}
+@font-face{font-family:Rozha;src:url(fonts/RozhaOne-Regular.ttf)}
+@font-face{font-family:Courier;font-weight:700;src:url(fonts/CourierPrime-Bold.ttf)}
+html,body{margin:0;background:#000}canvas{display:block}
+</style></head><body>
+<canvas id="c" width="2160" height="3840"></canvas>
+<script>
+const W=1080,H=1920,S=2,C=document.getElementById('c'),X=C.getContext('2d');
+X.imageSmoothingQuality='high';
+const GOLD='#F4C25B',CREAM='#FFF3DC',RED='#FF4B3A',INK='#1b1712';
+const cl=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)), lin=(t,a,b)=>cl((t-a)/(b-a));
+const eOut=x=>1-Math.pow(1-x,3), eIO=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const eBack=x=>{const c1=2.2,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
+function R(s){let x=Math.sin(s*127.1+311.7)*43758.5453;return x-Math.floor(x)}
+const seg=new Intl.Segmenter('hi',{granularity:'grapheme'});
+
+// ---------- script (corrected transcript) ----------
+const L=[
+ [0.00,2.50,'वैभव की कमाल की *बैट स्पीड* है'],
+ [2.56,4.90,'छोटा है, लेकिन एक अलग *फियरलेस* अप्रोच है उसकी'],
+ [4.96,6.70,'इतनी तेज़ *बैट स्पीड* तो मुझमें नहीं थी'],
+ [6.72,8.95,'इतने ज़ोर से बैट घुमाता है कि उसके...'],
+ [9.44,13.1,'...*बॉलर को डर* लगता है — अगर वो सीधा कहीं मार दे तो?'],
+ [13.22,16.7,'वैभव के पास एक *X-फैक्टर* है, जो काफ़ी *रेयर* मिलता है'],
+ [17.08,19.4,'RR के जो नेट्स बॉलर थे, मैं उनको जानता हूँ'],
+ [19.44,22.6,'वो बोल रहे थे — नेट्स में हम उसको आगे बॉल पिच नहीं करते'],
+ [22.66,25.0,'क्योंकि आगे डालेंगे, तो वो *सीधा मार* सकता है'],
+ [25.06,27.85,'तो हम उसको *शॉर्ट बॉल* डालते हैं — वो उस तरफ़ मारे, हमारी तरफ़ नहीं'],
+ [27.90,30.6,'इतने ज़ोर से मारता है... ऐसा *फियर* क्रिएट करके रखा है!'],
+];
+const END=31.0;
+// parse into graphemes with highlight flag
+const LINES=L.map(([a,b,s])=>{const g=[];let hl=false;
+  for(const {segment:ch} of seg.segment(s)){ if(ch==='*'){hl=!hl;continue} g.push({ch,hl}); }
+  return {a,b,g};});
+// typing time of each grapheme (spaces are quick, punctuation pause)
+LINES.forEach(l=>{const n=l.g.length;let w=l.g.map(o=>o.ch===' '?0.6:/[,—.?!]/.test(o.ch)?1.6:1);
+  const tot=w.reduce((x,y)=>x+y,0);let acc=0;l.g.forEach((o,i)=>{acc+=w[i];o.t=l.a+(l.b-l.a)*acc/tot})});
+window.KEYS=LINES.flatMap(l=>l.g.filter(o=>o.ch!==' ').map(o=>+o.t.toFixed(3)));
+window.DINGS=LINES.map(l=>l.b);
+
+// ---------- shots ----------
+// img, t0,t1, cx,cy (focus, fraction of image), h0,h1 (visible height fraction), dx (pan in frac), tint
+const SH=[
+ {im:'A',t0:0,   t1:4.96, cx:.31,cy:.36,h0:.56,h1:.47,dx:0},
+ {im:'C',t0:4.96,t1:9.44, cx:.40,cy:.50,h0:1.0,h1:.92,dx:.10},
+ {im:'C',t0:9.44,t1:13.22,cx:.62,cy:.48,h0:.62,h1:.50,dx:-.03,tint:'red'},
+ {im:'A',t0:13.22,t1:19.44,cx:.40,cy:.50,h0:1.0,h1:.84,dx:.02},
+ {im:'B',t0:19.44,t1:25.06,cx:.66,cy:.42,h0:.86,h1:.72,dx:-.06},
+ {im:'C',t0:25.06,t1:27.9, cx:.52,cy:.50,h0:.80,h1:.66,dx:.06},
+ {im:'A',t0:27.9,t1:END+1,cx:.31,cy:.33,h0:.50,h1:.40,dx:0},
+];
+const IM={};
+function load(n){return new Promise(r=>{const i=new Image();i.onload=()=>{IM[n]=i;r()};i.src='img/'+n+'.jpg'})}
+let RMS=[];
+// grain tiles
+const GR=[];
+function mkGrain(){for(let k=0;k<4;k++){const g=document.createElement('canvas');g.width=g.height=512;const c=g.getContext('2d');
+ const d=c.createImageData(512,512);for(let i=0;i<d.data.length;i+=4){const v=128+(Math.random()-.5)*110;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255}
+ c.putImageData(d,0,0);GR.push(g)}}
+
+function drawShot(s,t,alpha=1){
+  const im=IM[s.im],p=eIO(lin(t,s.t0,s.t1)), p2=lin(t,s.t0,s.t1);
+  const vh=im.height*(s.h0+(s.h1-s.h0)*p), vw=vh*W/H;
+  let cx=im.width*(s.cx+s.dx*(p2-.5)), cy=im.height*s.cy;
+  // punch-in on cut
+  const punch=1+0.06*Math.exp(-((t-s.t0)*7))*(t>=s.t0?1:0);
+  const w2=vw/punch,h2=vh/punch;
+  let sx=cl(cx-w2/2,0,im.width-w2), sy=cl(cy-h2/2,0,im.height-h2);
+  X.save();X.globalAlpha=alpha;
+  if(w2>im.width){ // too wide: blurred fill + fitted
+    X.filter='blur(30px) brightness(.5)';X.drawImage(im,0,0,im.width,im.height,-100,-100,W+200,H+200);X.filter='none';
+    const hh=W*im.height/im.width;X.drawImage(im,0,(H-hh)/2-120,W,hh);
+  } else X.drawImage(im,sx,sy,w2,h2,0,0,W,H);
+  X.restore();
+}
+
+function grade(t,shot){
+  // warm cinematic grade via overlays
+  X.save();
+  X.globalCompositeOperation='multiply';X.fillStyle=shot.tint==='red'?'rgba(255,120,100,.55)':'rgba(255,214,170,.42)';X.fillRect(0,0,W,H);
+  X.globalCompositeOperation='soft-light';X.fillStyle='rgba(20,40,70,.35)';X.fillRect(0,0,W,H);
+  X.restore();
+  // darkening gradient for text area (bottom) + top
+  let g=X.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'rgba(8,6,4,.72)');g.addColorStop(.17,'rgba(8,6,4,.05)');g.addColorStop(.42,'rgba(8,6,4,0)');
+  g.addColorStop(.58,'rgba(8,6,4,.62)');g.addColorStop(1,'rgba(8,6,4,.96)');
+  X.fillStyle=g;X.fillRect(0,0,W,H);
+  // vignette
+  g=X.createRadialGradient(W/2,H*.42,H*.25,W/2,H*.5,H*.78);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.65)');
+  X.fillStyle=g;X.fillRect(0,0,W,H);
+}
+
+function lightLeak(t){
+  // drifting warm leak
+  const x=W*(.5+.6*Math.sin(t*.37)),y=H*(.25+.2*Math.cos(t*.29));
+  const g=X.createRadialGradient(x,y,0,x,y,700);g.addColorStop(0,'rgba(255,160,60,.20)');g.addColorStop(1,'rgba(255,120,40,0)');
+  X.save();X.globalCompositeOperation='screen';X.fillStyle=g;X.fillRect(0,0,W,H);X.restore();
+}
+
+function header(t){
+  X.save();X.textAlign='center';X.textBaseline='middle';
+  // tag
+  const a=eOut(lin(t,.1,.6));X.globalAlpha=a;
+  X.font='700 30px Courier';const tag='●  PODCAST  ·  क्रिकेट टॉक';
+  const tw=X.measureText(tag).width+56;
+  X.fillStyle='rgba(255,75,58,.92)';rr(W/2-tw/2,118,tw,58,29);X.fill();
+  X.fillStyle='#fff';X.globalAlpha=a*(t%1<.5||t<1?1:1);X.fillText(tag,W/2,148);
+  // name typed
+  X.globalAlpha=1;const name='वैभव सूर्यवंशी';const gs=[...seg.segment(name)].map(s=>s.segment);
+  const n=Math.floor(cl((t-.3)/1.1)*gs.length+.001);
+  X.font='118px Rozha';X.shadowColor='rgba(0,0,0,.6)';X.shadowBlur=24;
+  const full=X.measureText(name).width; const shown=gs.slice(0,n).join('');
+  X.textAlign='left';X.fillStyle=GOLD;X.fillText(shown,W/2-full/2,268);
+  if(n<gs.length&&t>.2){X.fillStyle=CREAM;X.fillRect(W/2-full/2+X.measureText(shown).width+6,215,10,100)}
+  X.shadowBlur=0;
+  // subtitle with letter spacing
+  X.textAlign='center';X.globalAlpha=eOut(lin(t,1.4,2.0));X.font='700 30px Courier';X.fillStyle=CREAM;
+  X.letterSpacing='12px';X.fillText('THE FEARLESS KID',W/2+6,360);X.letterSpacing='0px';
+  // rule
+  const rl=eOut(lin(t,1.5,2.3))*300;X.globalAlpha=.8;X.fillStyle=GOLD;X.fillRect(W/2-rl/2,398,rl,3);
+  X.restore();
+}
+function rr(x,y,w,h,r){X.beginPath();X.moveTo(x+r,y);X.arcTo(x+w,y,x+w,y+h,r);X.arcTo(x+w,y+h,x,y+h,r);X.arcTo(x,y+h,x,y,r);X.arcTo(x,y,x+w,y,r);X.closePath()}
+
+// ---- typewriter block ----
+const FS=76, LH=110, MAXW=900, LEFT=90;
+function wrap(l){ // returns rows of grapheme index ranges
+  X.font=FS+'px Tiro';const words=[];let cur=[];
+  l.g.forEach((o,i)=>{cur.push(i);if(o.ch===' '){words.push(cur);cur=[]}});if(cur.length)words.push(cur);
+  const rows=[];let row=[],w=0;
+  for(const wd of words){const ww=X.measureText(wd.map(i=>l.g[i].ch).join('')).width;
+    if(w+ww>MAXW&&row.length){rows.push(row);row=[];w=0}row.push(...wd);w+=ww}
+  if(row.length)rows.push(row);return rows;
+}
+let WR=null;
+function typeBlock(t){
+  if(!WR)WR=LINES.map(wrap);
+  // which lines are active
+  let cur=-1;LINES.forEach((l,i)=>{if(t>=l.a-0.02)cur=i});
+  if(cur<0)return;
+  const baseY=1560; // y of first row of current line
+  X.save();X.textBaseline='alphabetic';X.font=FS+'px Tiro';
+  // carriage return scroll: previous line slides up
+  const k=lin(t,LINES[cur].a-0.02,LINES[cur].a+0.28), sc=eBack(k);
+  for(let j=Math.max(0,cur-1);j<=cur;j++){
+    const l=LINES[j],rows=WR[j];
+    let y0;
+    if(j===cur){ y0=baseY+(1-sc)*120; }
+    else { const h=rows.length*LH+40; y0=baseY-h*sc; }
+    const old=j<cur, fade=old?(1-eOut(k))*0.0+0.32:1;
+    if(old&&y0<1080)continue;
+    rows.forEach((row,ri)=>{
+      let x=LEFT,y=y0+ri*LH;
+      row.forEach(i=>{const o=l.g[i];if(t<o.t)return;
+        const age=t-o.t, pop=1+0.35*Math.exp(-age*30);
+        const w=X.measureText(o.ch).width;
+        X.save();X.globalAlpha=fade*cl(age*30+.25);
+        const jx=(R(i*3.1+j)-.5)*1.6,jy=(R(i*7.7+j)-.5)*2.2;
+        X.translate(x+w/2+jx,y+jy);X.scale(pop,pop);
+        X.fillStyle=o.hl?(old?CREAM:GOLD):CREAM;
+        if(o.hl&&!old){X.shadowColor='rgba(244,194,91,.55)';X.shadowBlur=26}
+        else {X.shadowColor='rgba(0,0,0,.8)';X.shadowBlur=10}
+        X.fillText(o.ch,-w/2,0);X.restore();
+        // highlighter underline for keywords
+        if(o.hl&&!old){const u=cl((age-.05)*6);X.fillStyle='rgba(255,75,58,.85)';X.fillRect(x-2,y+16,(w+4)*u,6)}
+        x+=w;
+      });
+      // cursor
+      if(j===cur){
+        const lastIdx=row.filter(i=>t>=l.g[i].t);const done=t>=l.b;
+        const typedHere=lastIdx.length>0&&(ri===rows.length-1||!rows[ri+1].some(i=>t>=l.g[i].t));
+        if(typedHere||(ri===0&&lastIdx.length===0)){
+          const blink=done?(Math.floor(t*2.2)%2===0):true;
+          if(blink){X.fillStyle=GOLD;X.fillRect(x+6,y-FS*.78,FS*.42,FS*.95)}
+        }
+      }
+    });
+  }
+  X.restore();
+}
+
+function waveform(t){
+  const fi=Math.floor(t*30),N=48,bw=10,gap=8,tot=N*(bw+gap)-gap,x0=W/2-tot/2,yb=1830;
+  X.save();
+  for(let i=0;i<N;i++){const d=Math.abs(i-(N-1)/2);const v=RMS[Math.max(0,fi-Math.round(d))]||0;
+    const h=6+v*90*(1-d/(N*.62));
+    X.fillStyle=`rgba(244,194,91,${.35+.6*v})`;rr(x0+i*(bw+gap),yb-h/2,bw,h,5);X.fill()}
+  // progress
+  X.fillStyle='rgba(255,255,255,.18)';X.fillRect(90,1892,W-180,4);
+  X.fillStyle=GOLD;X.fillRect(90,1892,(W-180)*cl(t/END),4);
+  X.restore();
+}
+
+function finale(t){
+  const s=29.55;if(t<s)return;const k=lin(t,s,s+.35);
+  X.save();X.translate(W/2,720);X.rotate(-0.12);const sc=1+(1-eOut(k))*1.6;X.scale(sc,sc);X.globalAlpha=cl(k*2)*0.95;
+  X.strokeStyle=RED;X.lineWidth=10;rr(-330,-95,660,190,18);X.stroke();
+  X.font='700 120px Courier';X.textAlign='center';X.textBaseline='middle';X.fillStyle=RED;X.letterSpacing='10px';
+  X.fillText('FEARLESS',6,8);X.restore();
+}
+
+function render(t){
+  X.setTransform(S,0,0,S,0,0);X.fillStyle='#000';X.fillRect(0,0,W,H);
+  let si=SH.findIndex(s=>t>=s.t0&&t<s.t1);if(si<0)si=SH.length-1;const sh=SH[si];
+  // camera shake on beat moments (strong words)
+  const shake=[[2.1,.5],[3.9,.5],[7.0,.7],[10.0,.8],[14.6,.5],[24.2,.6],[29.5,.9]].reduce((a,[tt,m])=>a+m*Math.exp(-Math.max(0,t-tt)*9)*(t>=tt?1:0),0);
+  X.save();X.translate(Math.sin(t*90)*shake*8,Math.cos(t*77)*shake*6);
+  drawShot(sh,t);
+  // whip-blur transition from previous
+  const dt=t-sh.t0;
+  if(si>0&&dt<0.22){const pv=SH[si-1];const a=1-dt/0.22;X.save();X.filter=`blur(${18*a}px)`;drawShot(pv,t,a*0.9);X.restore();}
+  X.restore();
+  grade(t,sh);lightLeak(t);
+  // flash on cut
+  if(si>0&&dt<0.25){X.fillStyle=`rgba(255,240,215,${.55*(1-dt/.25)})`;X.fillRect(0,0,W,H)}
+  // grain
+  X.save();X.globalCompositeOperation='overlay';X.globalAlpha=.20;const gt=GR[Math.floor(t*30)%4];
+  const ox=-R(Math.floor(t*30))*300,oy=-R(Math.floor(t*30)+.5)*300;
+  for(let y=oy;y<H;y+=512)for(let x=ox;x<W;x+=512)X.drawImage(gt,x,y);X.restore();
+  // dust specks
+  X.save();for(let i=0;i<6;i++){const s=Math.floor(t*12)*13+i;if(R(s)>.55)continue;X.fillStyle=`rgba(255,250,235,${.25*R(s+1)})`;
+    X.beginPath();X.arc(R(s+2)*W,R(s+3)*H,1+R(s+4)*2.5,0,7);X.fill()}X.restore();
+  header(t);typeBlock(t);finale(t);waveform(t);
+  // fade in/out
+  const fo=Math.max(1-lin(t,0,.35),lin(t,END-.45,END));if(fo>0){X.fillStyle=`rgba(0,0,0,${fo})`;X.fillRect(0,0,W,H)}
+}
+window.render=render;
+window.ready=(async()=>{await document.fonts.load('70px Tiro');await document.fonts.load('100px Rozha');await document.fonts.load('700 30px Courier');
+  await Promise.all(['A','B','C'].map(load));RMS=await (await fetch('rms.json')).json();mkGrain();return true})();
+</script></body></html>
