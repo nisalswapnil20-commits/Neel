@@ -13,3 +13,13 @@ Background footage: Mixkit (https://mixkit.co), free under the Mixkit Free Licen
 
 Fonts: Rozha One, Mukta (Google Fonts, SIL Open Font License).
 All typography, particles, ripples, and light effects are generated in code (`source/`).
+
+---
+
+## Samay_Raina_Typewriter_9x16.mp4
+
+- Voiceover: user-supplied audio clip (Samay Raina).
+- Photos: the three user-supplied stills of Samay Raina; the TIMES NOW logo in one of them is cropped out of frame.
+- Background music, typewriter key clicks, whooshes, and bell: all synthesized in code (`source/samay/audio.py`), so no third-party music license applies.
+- Fonts: Special Elite, Courier Prime, Tiro Devanagari Hindi, Oswald (Google Fonts, SIL Open Font License).
+- Typewriter captions, transitions, light leaks, grain, and particles are generated in code (`source/samay/tw.html`).
