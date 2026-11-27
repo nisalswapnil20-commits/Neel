@@ -1,0 +1,168 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Tiro;src:url(fonts/TiroDevanagariHindi-Regular.ttf)}
+@font-face{font-family:Martel;font-weight:800;src:url(fonts/Martel-ExtraBold.ttf)}
+@font-face{font-family:Elite;src:url(fonts/SpecialElite-Regular.ttf)}
+@font-face{font-family:Courier;font-weight:700;src:url(fonts/CourierPrime-Bold.ttf)}
+html,body{margin:0;background:transparent}canvas{display:block}
+</style></head><body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+const W=1080,H=1920,C=document.getElementById('c'),X=C.getContext('2d');
+const AMBER='#FFC247',PAPER='#F6EFE2',INK='#FFFFFF';
+const cl=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)), lin=(t,a,b)=>cl((t-a)/(b-a));
+const eOut=x=>1-Math.pow(1-x,3);
+const R=s=>{let x=Math.sin(s*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const SEG=new Intl.Segmenter('hi',{granularity:'grapheme'});
+const graph=s=>[...SEG.segment(s)].map(g=>g.segment);
+const END=24.8, VO_END=23.35;
+
+// ---- caption groups: words with start times (from transcription). *word* = highlight
+// y: centre of text block; size: font px; end: when the group leaves
+const GROUPS=[
+ {y:1500,size:104,end:1.58,words:[['ऐसे',0.00],['तो',0.54],['जीते',0.70],['हैं',0.96],['*मर्द',1.12],['लोग',1.38]]},
+ {y:1060,size:112,end:4.80,words:[['आधे',1.58],['मर्द',2.06],['यहाँ',2.42],['*डिप्रेशन',2.64],['में',3.08],['हैं',3.20]]},
+ {y:1060,size:120,end:5.92,words:[['*अंदर',4.86],['चल',5.38],['रहा',5.62],['है…',5.78]]},
+ {y:1060,size:108,end:8.80,words:[['बाप',5.94],['का',6.22],['*सपना',6.40],['नहीं',6.74],['पूरा',6.92],['कर',7.10],['पाया',7.30],['यार',7.58]]},
+ {y:1060,size:116,end:10.02,words:[['वो',8.92],['लड़की',9.26],['*सही',9.60],['थी',9.90]]},
+ {y:1480,size:112,end:11.40,ding:true,words:[['मैं',10.04],['ही',10.22],['*चू**या',10.34],['निकला',10.68]]},
+ {y:1060,size:112,end:14.90,words:[['पता',11.42],['नहीं',12.28],['कहाँ',12.40],['होगी',12.60],['वो…',12.88]]},
+ {y:1060,size:108,end:17.22,words:[['ये',15.00],['तो',15.60],['*नाटक',15.76],['करते',16.10],['हैं',16.42],['पूरा',16.62],['टाइम',16.88]]},
+ {y:1000,size:106,end:19.40,words:[['हम',17.26],['*मर्द',17.48],['हैं,',17.74],['\n',18.0],['हम',18.04],['थोड़ी',18.30],['*इमोशन',18.56],['दिखाएँगे',18.86],['न',19.30]]},
+ {y:1060,size:150,end:20.82,words:[['*दबाओ',19.40],['अंदर',19.74]]},
+ {y:1500,size:128,end:21.95,ding:true,words:[['*मर्द',20.86],['हूँ',21.14],['मैं',21.30]]},
+ {y:1060,size:118,end:23.40,words:[['क्या',21.98],['है',22.36],['ये',22.52],['*ज़िंदगी',22.66]]},
+];
+
+// build per-grapheme typing schedule + layout
+const EV=[]; // sound events
+function build(){
+ for(const g of GROUPS){
+  X.font=`${g.size}px Tiro`;
+  const sp=X.measureText(' ').width;
+  const lines=[[]]; let lw=0;
+  g.words.forEach(([raw,t],i)=>{
+   if(raw==='\n'){lines.push([]);lw=0;return}
+   const hl=raw.startsWith('*'), txt=hl?raw.slice(1):raw;
+   const w=X.measureText(txt).width;
+   if(lines.at(-1).length && lw+sp+w>940){lines.push([]);lw=0}
+   const nxt=(g.words.slice(i+1).find(v=>v[0]!=='\n')||[0,g.end-0.15])[1];
+   const gs=graph(txt), dur=Math.min(nxt-t-0.02, 0.055*gs.length, 0.42);
+   const per=Math.max(dur,0.03*gs.length)/gs.length;
+   const word={txt,hl,w,gs,times:gs.map((_,k)=>t+k*per)};
+   word.done=word.times.at(-1)+per;
+   lines.at(-1).push(word); lw+=(lines.at(-1).length>1?sp:0)+w;
+   word.times.forEach((tt,k)=>{ if(gs[k].trim()&&gs[k]!=='…') EV.push({t:tt,k:'key'}) });
+  });
+  g.lines=lines.filter(l=>l.length); g.sp=sp;
+  g.start=g.words[0][1]; g.last=Math.max(...g.lines.flat().map(w=>w.done));
+  const lh=g.size*1.42;
+  g.lines.forEach((l,li)=>{
+   const tot=l.reduce((a,w)=>a+w.w,0)+sp*(l.length-1); let x=(W-tot)/2;
+   const y=g.y+(li-(g.lines.length-1)/2)*lh;
+   l.forEach(w=>{w.x=x;w.y=y;x+=w.w+sp});
+  });
+  if(g.ding) EV.push({t:g.last+0.04,k:'ding'});
+  EV.push({t:g.start-0.02,k:'cut'});
+ }
+}
+
+function drawGroup(g,t){
+ if(t<g.start-0.05||t>g.end+0.25) return;
+ const out=lin(t,g.end-0.10,g.end+0.12); if(out>=1) return;
+ X.save();
+ X.globalAlpha=1-out; X.translate(0,-30*eOut(out));
+ // legibility band
+ const top=g.lines[0][0].y-g.size*1.1, bot=g.lines.at(-1)[0].y+g.size*1.0;
+ const band=X.createLinearGradient(0,top-140,0,bot+140);
+ const a=0.55*lin(t,g.start-0.05,g.start+0.25);
+ band.addColorStop(0,'rgba(0,0,0,0)');band.addColorStop(0.3,`rgba(0,0,0,${a})`);
+ band.addColorStop(0.7,`rgba(0,0,0,${a})`);band.addColorStop(1,'rgba(0,0,0,0)');
+ X.fillStyle=band;X.fillRect(0,top-140,W,bot-top+280);
+ X.font=`${g.size}px Tiro`; X.textBaseline='alphabetic'; X.textAlign='left';
+ let cur=null;
+ for(const l of g.lines) for(const w of l){
+  const n=w.times.filter(tt=>tt<=t).length; if(!n) continue;
+  const s=w.gs.slice(0,n).join('');
+  const base=w.y+g.size*0.34;
+  // highlighter sweep behind key words once typed
+  if(w.hl){
+   const sw=eOut(lin(t,w.done,w.done+0.22));
+   if(sw>0){X.fillStyle='rgba(255,194,71,0.92)';
+    X.fillRect(w.x-10,w.y-g.size*0.50,(w.w+20)*sw,g.size*1.02);}
+  }
+  const ink=w.hl&&lin(t,w.done,w.done+0.22)>0.5?'#141008':(w.hl?AMBER:INK);
+  // newest glyph: strike-in (slight drop + ink flash)
+  const tl=w.times[n-1], k=lin(t,tl,tl+0.09);
+  X.save();
+  X.shadowColor='rgba(0,0,0,0.75)';X.shadowBlur=w.hl&&ink!==AMBER?0:18;X.shadowOffsetY=4;
+  X.fillStyle=ink;
+  // jitter per word like a real typewriter (deterministic)
+  const jy=(R(w.x)-0.5)*5;
+  if(n>1){X.fillText(w.gs.slice(0,n-1).join(''),w.x,base+jy)}
+  const pre=X.measureText(w.gs.slice(0,n-1).join('')).width;
+  X.globalAlpha*=0.35+0.65*k;
+  X.fillText(s,w.x,base+jy-(1-k)*10); // full prefix redraw keeps Devanagari shaping
+  X.restore();
+  cur={x:w.x+X.measureText(s).width+8,y:w.y,h:g.size,t:tl};
+ }
+ // cursor
+ if(cur&&out===0){
+  const idle=t-cur.t, on=idle<0.25||Math.floor(idle/0.42)%2===0;
+  if(on){X.fillStyle=AMBER;X.fillRect(cur.x,cur.y-cur.h*0.46,cur.h*0.09,cur.h*0.92)}
+ }
+ X.restore();
+}
+
+function header(t){
+ // top label typed once, then stays
+ const lab='SAMAY RAINA', a=lin(t,0.15,0.6);
+ X.save();X.globalAlpha=a*(1-lin(t,23.4,23.7));
+ X.font='44px Elite';X.textAlign='center';X.fillStyle=PAPER;X.letterSpacing='10px';
+ const n=Math.floor(cl((t-0.15)/0.05,0,lab.length));
+ X.shadowColor='rgba(0,0,0,0.7)';X.shadowBlur=14;
+ X.fillText(lab.slice(0,n),W/2,178);
+ X.font='30px Courier';X.letterSpacing='6px';X.fillStyle=AMBER;
+ X.fillText('— STAND-UP —',W/2,232);
+ X.restore();
+ // progress bar
+ X.fillStyle='rgba(255,255,255,0.18)';X.fillRect(90,1792,900,5);
+ X.fillStyle=AMBER;X.fillRect(90,1792,900*cl(t/END),5);
+}
+
+function outro(t){
+ if(t<23.35) return;
+ const a=lin(t,23.35,23.75);
+ X.save();
+ X.fillStyle=`rgba(8,7,6,${0.78*a})`;X.fillRect(0,0,W,H);
+ const lab='SAMAY RAINA'; const n=Math.floor(cl((t-23.55)/0.045,0,lab.length));
+ X.font='96px Elite';X.textAlign='center';X.fillStyle=PAPER;X.letterSpacing='6px';
+ X.fillText(lab.slice(0,n),W/2,930);
+ const w=X.measureText(lab.slice(0,n)).width;
+ if(n<lab.length||Math.floor(t/0.4)%2===0){X.fillStyle=AMBER;X.fillRect(W/2+w/2+10,858,10,86)}
+ const b=lin(t,24.1,24.4);
+ X.globalAlpha=b;X.font='800 58px Martel';X.letterSpacing='0px';X.fillStyle=AMBER;
+ X.fillText('मर्द को भी दर्द होता है।',W/2,1070+20*(1-eOut(b)));
+ X.restore();
+ if(t>24.1&&EV.every(e=>e.k!=='ding2')) {}
+}
+
+function render(t){
+ X.clearRect(0,0,W,H);
+ // subtle top/bottom gradient so header & bar read on any footage
+ let g=X.createLinearGradient(0,0,0,360);g.addColorStop(0,'rgba(0,0,0,0.55)');g.addColorStop(1,'rgba(0,0,0,0)');
+ X.fillStyle=g;X.fillRect(0,0,W,360);
+ g=X.createLinearGradient(0,H-300,0,H);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,0.55)');
+ X.fillStyle=g;X.fillRect(0,H-300,W,300);
+ for(const gr of GROUPS) drawGroup(gr,t);
+ header(t); outro(t);
+}
+window.ready=document.fonts.load('104px Tiro').then(()=>Promise.all([
+ document.fonts.load('44px Elite'),document.fonts.load('30px Courier'),document.fonts.load('800 58px Martel')]))
+ .then(()=>{build();
+  // outro typing sounds
+  for(let i=0;i<11;i++) if(i!==5) EV.push({t:23.55+i*0.045,k:'key'});
+  EV.push({t:24.1,k:'ding'});
+  EV.sort((a,b)=>a.t-b.t); window.EVENTS=EV;});
+</script></body></html>
